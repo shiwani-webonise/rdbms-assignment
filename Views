@@ -1,0 +1,12 @@
+1) View to generate order and payment details
+CREATE VIEW order_details AS SELECT o.id,o.final_cost,o.order_date,p.discount_coupon,p.payment_type,p.payment_status 
+FROM prders o, payments 
+WHERE o.id=p.order_id;
+
+------------------------------------------------------------------------------------
+2) View to generate monthly report:
+
+CREATE VIEW monthly_report AS SELECT o1.id, o1.order_date,p.product_name,v.price,v.price*o2.product_quantity total_item_price, o1.final_cost,u.user_name,u.email
+FROM orders o1, products p, variants v, users u,order_history o2
+WHERE o1.user_id=u.id AND v.product_id=p.id AND o2.order_id=o1.id AND v.id=o2.variant_id AND DATEDIFF(now(), o1.order_date)BETWEEN 0 AND 30;
+
