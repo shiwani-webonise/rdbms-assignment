@@ -1,0 +1,14 @@
+DELIMITER $$
+CREATE PROCEDURE insert_into_payments(IN p_id INT,IN o_id INT,IN payment_method VARCHAR(20),IN discount DECIMAL(10,2, IN total_cost DECIMAL(10,2),IN pay_date DATE, IN pay_status VARCHAR(10))
+BEGIN
+DECLARE roll_back bool DEFAULT false;
+DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET roll_back =  true;
+START TRANSACTION;
+INSERT INTO payments(id,order_id,payment_type,discount_coupon,checkout_cost,payment_date,payment_status) VALUES (p_id,o_id,payment_method,discount,total_cost,pay_date,pay_status);
+IF roll_back THEN
+	ROLLBACK;
+ELSE
+	COMMIT;
+END IF;
+END $$
+DELIMITER ;
