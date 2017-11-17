@@ -54,8 +54,9 @@ loop2: LOOP
       		SELECT done;
         	LEAVE loop2;
         END IF;
+	IF u_id==uid THEN
         INSERT INTO order_history(user_id,variant_id,product_id,product_quantity,order_id) VALUES (u_id,v_id,p_id,p_qty,o_id);
-        SELECT user_id FROM order_history;
+        END IF;
 END LOOP loop2;
 CLOSE cur2;
 DELETE FROM carts WHERE carts.user_id = uid;
