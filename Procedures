@@ -1,0 +1,100 @@
+DELIMITER $$ 
+CREATE PROCEDURE clear_cart()
+BEGIN
+DECLARE u_id INT;
+DECLARE v_id INT;
+DECLARE p_id INT;
+DECLARE p_qty INT;
+DECLARE o_id INT;
+DECLARE done bool;
+DECLARE cur1 CURSOR FOR
+	SELECT user_id,variant_id,product_id,product_quantity,order_id FROM carts;
+DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+OPEN cur1;
+loop1: LOOP
+		FETCH NEXT FROM cur1 INTO u_id,v_id,p_id,p_qty,o_id;
+        IF done THEN 
+        	LEAVE loop1;
+        END IF;
+        INSERT INTO order_history(user_id,variant_id,product_id,product_quantity,order_id) VALUES (u_id,v_id,p_id,p_qty,o_id);
+END LOOP loop1;
+DELETE FROM carts;
+END $$
+DELIMITER ;
+
+------------------------------------------------------------------------------------------------------------------------------------
+
+DELIMITER $$
+CREATE PROCEDURE insert_into_payments()
+BEGIN
+DECLARE roll_back bool DEFAULT false;
+DECLARE CONTINUE HANDLER FOR SQLEXCEPTION SET roll_back =  true;
+START TRANSACTION;
+INSERT INTO payments(id,order_id,payment_type,discount_coupon,checkout_cost,payment_date,payment_status) VALUES (p_id,o_id,payment_method,discount,total_cost,pay_date,pay_status);
+IF roll_back THEN
+	ROLLBACK;
+ELSE
+	COMMIT;
+END IF;
+END $$
+DELIMITER ;
+
+-------------------------------------------------------------------------------------------------------------------------------------
+
+DELIMITER $$
+CREATE PROCEDURE calculate_order_cost()
+BEGIN
+DECLARE orderID int;
+DECLARE userID int;
+DECLARE uid int;
+DECLARE vid int;
+DECLARE pid int;
+DECLARE done bool;
+DECLARE product_cost decimal(10,2);
+DECLARE cur1 CURSOR FOR 
+	SELECT id,user_id FROM orders;
+DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+OPEN cur1;
+loop1: LOOP
+			 FETCH NEXT FROM cur1 INTO orderID,userID;
+               IF done THEN
+        			LEAVE loop1;
+               END IF;
+             SET product_cost = (SELECT SUM(oh.product_quantity * v.price) FROM order_history oh,variants v WHERE oh.variant_id = v.id AND oh.user_id = userID);
+            UPDATE orders o SET o.final_cost =  product_cost WHERE o.id=orderID;
+            SELECT * FROM orders;
+END LOOP loop1;
+CLOSE cur1;
+END $$
+DELIMITER ;
+
+----------------------------------------------------------------------------------------------------------------------------------------------
+
+DELIMITER $$
+CREATE PROCEDURE calculate_checkout_cost()
+BEGIN
+DECLARE o_id INT;
+DECLARE discount decimal(10,2);
+DECLARE done bool;
+DECLARE final_cost decimal(10,2);
+DECLARE order_cost decimal(10,2);
+DECLARE cur1 CURSOR FOR
+	SELECT order_id,discount_coupon FROM payments;
+DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = true;
+OPEN cur1;
+loop1: LOOP
+	FETCH NEXT FROM cur1 INTO o_id,discount;
+    IF done THEN
+    	LEAVE loop1;
+    END IF;
+    SET order_cost = (SELECT final_cost FROM orders WHERE orders.id=o_id);
+    SET final_cost = (order_cost - discount);
+    UPDATE payments SET checkout_cost = final_cost WHERE payments.order_id=o_id;
+    SELECT * FROM payments;
+END LOOP loop1;
+CLOSE cur1;
+END $$
+DELIMITER ;
+
+------------------------------------------------------------------------------------------------------------------------------
+
