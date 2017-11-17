@@ -1,8 +1,10 @@
 DELIMITER $$
+CREATE PROCEDURE online_shopping_cart(IN uid INT)
 BEGIN
 DECLARE order_cost decimal(10,2);
 DECLARE discount decimal(10,2);
 DECLARE final_cost decimal(10,2);
+DECLARE status varchar(10);
 DECLARE stock1 INT;
 DECLARE quantity INT;
 DECLARE vid INT;
@@ -23,12 +25,12 @@ loop1: LOOP
 	IF done THEN
 		LEAVE loop1;
 	END IF;
-	SET stock1 = (SELECT v.stock FROM variants v,carts c, orders o WHERE o.user_id=uid AND o.id=c.order_id AND c.variant_id = v.id AND v.id=vid);
-	SET quantity = (SELECT c.product_quantity FROM carts c,orders o WHERE c.user_id=uid AND c.variant_id=vid AND c.order_id=o.id);
+	SET stock1 = (SELECT v.stock FROM variants v,carts c WHERE c.user_id=uid AND c.product_id = v.product_id AND c.variant_id = v.id AND v.id=vid);
+	SET quantity = (SELECT c.product_quantity FROM carts c WHERE c.user_id=uid AND c.variant_id=vid);
 	IF quantity>stock1 THEN
 		ROLLBACK;
 	ELSE
-		UPDATE variants v,carts c,orders o SET v.stock = (stock1 - quantity) WHERE o.user_id=uid AND o.id=c.order_id AND c.variant_id = v.id AND v.id=vid;
+		UPDATE variants v,carts c SET v.stock = (stock1 - quantity) WHERE c.user_id=uid AND c.product_id = v.product_id AND c.variant_id = v.id AND v.id=vid;
 	END IF;
 END LOOP loop1;
 CLOSE cur1;
@@ -36,6 +38,10 @@ SET done = FALSE;
 SET order_cost=(SELECT SUM(v.price * c.product_quantity) FROM variants v,carts c WHERE c.user_id=uid AND v.id=c.variant_id);
 UPDATE orders SET orders.final_cost = order_cost WHERE orders.user_id=uid;
 
+SET status = (select payment_status from payments);
+IF status = 'Failure'
+	ROLLBACK;
+END IF;
 SET discount = (SELECT p.discount_coupon FROM payments p WHERE p.id=uid);
 SET final_cost = (order_cost - discount);
 UPDATE payments,orders SET payments.checkout_cost = final_cost WHERE payments.order_id=orders.id AND orders.user_id=uid;
@@ -52,7 +58,7 @@ loop2: LOOP
         SELECT user_id FROM order_history;
 END LOOP loop2;
 CLOSE cur2;
-DELETE FROM carts;
+DELETE FROM carts WHERE carts.user_id = uid;
 COMMIT;
 END $$
 DELIMITER ;
